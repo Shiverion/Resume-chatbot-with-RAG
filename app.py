@@ -356,7 +356,7 @@ If the user is engaging in discussion, try to steer them towards getting in touc
         
         while iteration < max_iterations:
             response = self.gemini.chat.completions.create(
-                model="gemini-2.5-pro",  # Use faster model
+                model="gemini-2.5-flash",  # Use faster model
                 messages=messages, 
                 tools=tools,  # type: ignore
                 max_tokens=2048,  # Increased for complete responses
