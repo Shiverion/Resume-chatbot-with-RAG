@@ -11,6 +11,8 @@ import numpy as np
 from typing import List, Dict, Any
 import re
 from pathlib import Path
+import time
+from functools import lru_cache
 
 
 load_dotenv(override=True)
@@ -80,7 +82,7 @@ tools = [{"type": "function", "function": record_user_details_json},
 
 
 class RAGProcessor:
-    """Simple RAG processor for document retrieval"""
+    """Optimized RAG processor with caching and lazy loading"""
     
     def __init__(self, openai_client: OpenAI):
         self.openai_client = openai_client
@@ -92,6 +94,8 @@ class RAGProcessor:
             name="knowledge_base",
             metadata={"hnsw:space": "cosine"}
         )
+        self._embeddings_cache = {}
+        self._context_cache = {}
         
     def chunk_text(self, text: str, chunk_size: int = 1000, overlap: int = 200) -> List[str]:
         """Split text into overlapping chunks"""
@@ -119,21 +123,38 @@ class RAGProcessor:
             
         return chunks
     
-    def get_embeddings(self, texts: List[str]) -> List[List[float]]:
-        """Get embeddings for a list of texts"""
+    @lru_cache(maxsize=1000)
+    def get_embeddings_cached(self, text: str) -> List[float]:
+        """Get embeddings with caching to avoid repeated API calls"""
         try:
             response = self.openai_client.embeddings.create(
                 model="text-embedding-3-small",
-                input=texts
+                input=[text]
             )
-            return [embedding.embedding for embedding in response.data]
+            return response.data[0].embedding
         except Exception as e:
             print(f"Error getting embeddings: {e}")
             # Fallback to simple hash-based embeddings
-            return [[hash(text) % 1000 / 1000.0 for _ in range(1536)] for text in texts]
+            return [hash(text) % 1000 / 1000.0 for _ in range(1536)]
+    
+    def get_embeddings(self, texts: List[str]) -> List[List[float]]:
+        """Get embeddings for a list of texts with caching"""
+        embeddings = []
+        for text in texts:
+            embeddings.append(self.get_embeddings_cached(text))
+        return embeddings
     
     def process_documents(self, documents: Dict[str, str]):
         """Process and store documents in the vector database"""
+        # Check if documents are already processed
+        try:
+            count = self.collection.count()
+            if count > 0:
+                print(f"Vector database already contains {count} documents, skipping processing")
+                return
+        except:
+            pass
+        
         all_chunks = []
         all_metadata = []
         
@@ -143,22 +164,28 @@ class RAGProcessor:
             all_metadata.extend([{"source": doc_name, "chunk_index": i} for i in range(len(chunks))])
         
         if all_chunks:
+            print("Processing documents for RAG...")
             embeddings = self.get_embeddings(all_chunks)
             
             # Add documents to collection
             self.collection.add(
-                embeddings=embeddings,
+                embeddings=embeddings,  # type: ignore
                 documents=all_chunks,
                 metadatas=all_metadata,
                 ids=[f"chunk_{i}" for i in range(len(all_chunks))]
             )
             print(f"Processed {len(all_chunks)} chunks from {len(documents)} documents")
     
-    def retrieve_relevant_context(self, query: str, top_k: int = 5) -> str:
-        """Retrieve relevant context for a query"""
+    def retrieve_relevant_context(self, query: str, top_k: int = 3) -> str:
+        """Retrieve relevant context for a query with caching"""
+        # Simple cache key
+        cache_key = f"{query[:50]}_{top_k}"
+        if cache_key in self._context_cache:
+            return self._context_cache[cache_key]
+        
         try:
             # Get query embedding
-            query_embedding = self.get_embeddings([query])[0]
+            query_embedding = self.get_embeddings_cached(query)
             
             # Search for similar documents
             results = self.collection.query(
@@ -166,13 +193,19 @@ class RAGProcessor:
                 n_results=top_k
             )
             
-            if results['documents'] and results['documents'][0]:
+            if results and results.get('documents') and results['documents'] and results['documents'][0]:
                 context_parts = []
                 for i, doc in enumerate(results['documents'][0]):
-                    source = results['metadatas'][0][i]['source']
+                    if results.get('metadatas') and results['metadatas'][0] and i < len(results['metadatas'][0]):
+                        source = results['metadatas'][0][i].get('source', 'Unknown')
+                    else:
+                        source = 'Unknown'
                     context_parts.append(f"Source: {source}\n{doc}\n")
                 
-                return "\n".join(context_parts)
+                context = "\n".join(context_parts)
+                # Cache the result
+                self._context_cache[cache_key] = context
+                return context
             else:
                 return ""
                 
@@ -187,13 +220,8 @@ class Me:
         self.gemini = OpenAI(base_url="https://generativelanguage.googleapis.com/v1beta/openai/", api_key=os.getenv("GEMINI_API_KEY"))
         self.name = "Muhammad Iqbal Hilmy Izzulhaq"
         
-        # Initialize RAG processor
-        self.rag_processor = RAGProcessor(self.gemini)
-        
-        # Load and process documents
-        self.load_and_process_documents()
-        
-        # Load static content for fallback
+        # Load static content first for faster startup
+        print("Loading static content...")
         reader = PdfReader("me/linkedin.pdf")
         self.linkedin = ""
         for page in reader.pages:
@@ -202,6 +230,13 @@ class Me:
                 self.linkedin += text
         with open("me/summary.txt", "r", encoding="utf-8") as f:
             self.summary = f.read()
+        
+        # Initialize RAG processor
+        print("Initializing RAG processor...")
+        self.rag_processor = RAGProcessor(self.gemini)
+        
+        # Load and process documents in background
+        self.load_and_process_documents()
 
     def load_and_process_documents(self):
         """Load all documents and process them for RAG"""
@@ -269,28 +304,44 @@ If the user is engaging in discussion, try to steer them towards getting in touc
         return system_prompt
     
     def chat(self, message, history):
-        # Get relevant context using RAG
-        relevant_context = self.rag_processor.retrieve_relevant_context(message)
+        # Only use RAG for longer queries or specific questions
+        use_rag = len(message) > 20 or any(keyword in message.lower() for keyword in 
+                                          ['experience', 'skill', 'project', 'work', 'job', 'career', 'background'])
+        
+        relevant_context = ""
+        if use_rag:
+            relevant_context = self.rag_processor.retrieve_relevant_context(message)
         
         # Create system prompt with RAG context
         system_prompt = self.system_prompt(relevant_context)
         
         messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": message}]
-        done = False
-        while not done:
-            response = self.gemini.chat.completions.create(model="gemini-2.5-pro", messages=messages, tools=tools)
-            if response.choices[0].finish_reason=="tool_calls":
+        
+        # Limit tool call iterations to prevent infinite loops
+        max_iterations = 3
+        iteration = 0
+        
+        while iteration < max_iterations:
+                    response = self.gemini.chat.completions.create(
+            model="gemini-2.5-pro", 
+            messages=messages, 
+            tools=tools,  # type: ignore
+            max_tokens=1000  # Limit response length for faster responses
+        )
+            
+            if response.choices[0].finish_reason == "tool_calls":
                 message = response.choices[0].message
                 tool_calls = message.tool_calls
                 results = self.handle_tool_call(tool_calls)
                 messages.append(message)
                 messages.extend(results)
+                iteration += 1
             else:
-                done = True
+                break
+                
         return response.choices[0].message.content
     
 
 if __name__ == "__main__":
     me = Me()
     gr.ChatInterface(me.chat, type="messages").launch()
-    
