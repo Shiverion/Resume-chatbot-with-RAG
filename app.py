@@ -202,6 +202,27 @@ class RAGProcessor:
             )
             print(f"Processed {len(all_chunks)} chunks from {len(documents)} documents")
     
+    def add_document(self, content: str, doc_name: str):
+        """Add a single document to the RAG system"""
+        try:
+            chunks = self.chunk_text(content)
+            if chunks:
+                embeddings = self.get_embeddings(chunks)
+                metadata = [{"source": doc_name, "chunk_index": i} for i in range(len(chunks))]
+                ids = [f"{doc_name}_chunk_{i}" for i in range(len(chunks))]
+                
+                self.collection.add(
+                    embeddings=embeddings,  # type: ignore
+                    documents=chunks,
+                    metadatas=metadata,  # type: ignore
+                    ids=ids
+                )
+                print(f"Added document '{doc_name}' with {len(chunks)} chunks")
+                return True
+        except Exception as e:
+            print(f"Error adding document '{doc_name}': {e}")
+            return False
+    
     def retrieve_relevant_context(self, query: str, top_k: int = 2) -> str:
         """Retrieve relevant context for a query with enhanced caching"""
         # Create a more robust cache key
@@ -270,37 +291,47 @@ class Me:
         """Load all documents and process them for RAG"""
         documents = {}
         
-        # Load PDF documents
-        pdf_files = ["me/linkedin.pdf", "me/CV Data Scientist Muhammad Iqbal Hilmy Izzulhaq.pdf"]
-        for pdf_file in pdf_files:
-            if os.path.exists(pdf_file):
-                try:
-                    reader = PdfReader(pdf_file)
-                    content = ""
-                    for page in reader.pages:
-                        text = page.extract_text()
-                        if text:
-                            content += text + "\n"
-                    documents[Path(pdf_file).stem] = content
-                except Exception as e:
-                    print(f"Error loading {pdf_file}: {e}")
-        
-        # Load text files
-        text_files = ["me/summary.txt"]
-        for text_file in text_files:
-            if os.path.exists(text_file):
-                try:
-                    with open(text_file, "r", encoding="utf-8") as f:
-                        content = f.read()
-                    documents[text_file] = content
-                except Exception as e:
-                    print(f"Error loading {text_file}: {e}")
+        # Load ALL PDF and text files from me/ folder
+        me_folder = "me"
+        if os.path.exists(me_folder):
+            for file_path in Path(me_folder).glob("*"):
+                if file_path.is_file():
+                    try:
+                        if file_path.suffix.lower() == '.pdf':
+                            print(f"Loading PDF: {file_path.name}")
+                            reader = PdfReader(str(file_path))
+                            content = ""
+                            for page in reader.pages:
+                                text = page.extract_text()
+                                if text:
+                                    content += text + "\n"
+                            documents[file_path.stem] = content
+                        elif file_path.suffix.lower() in ['.txt', '.md']:
+                            print(f"Loading text file: {file_path.name}")
+                            with open(file_path, "r", encoding="utf-8") as f:
+                                content = f.read()
+                            documents[file_path.stem] = content
+                    except Exception as e:
+                        print(f"Error loading {file_path}: {e}")
         
         # Process documents for RAG
         if documents:
+            print(f"Found {len(documents)} documents to process:")
+            for doc_name in documents.keys():
+                print(f"  - {doc_name}")
             self.rag_processor.process_documents(documents)
         else:
             print("No documents found to process")
+
+    def add_document_to_rag(self, file_content, file_name):
+        """Add a document to the RAG system via the UI"""
+        if file_content and file_name:
+            success = self.rag_processor.add_document(file_content, file_name)
+            if success:
+                return f"✅ Successfully added '{file_name}' to RAG knowledge base!"
+            else:
+                return f"❌ Failed to add '{file_name}' to RAG knowledge base."
+        return "Please provide both file content and name."
 
     def handle_tool_call(self, tool_calls):
         results = []
