@@ -13,6 +13,7 @@ import re
 from pathlib import Path
 import time
 from functools import lru_cache
+import hashlib
 
 
 load_dotenv(override=True)
@@ -82,7 +83,7 @@ tools = [{"type": "function", "function": record_user_details_json},
 
 
 class RAGProcessor:
-    """Optimized RAG processor with caching and lazy loading"""
+    """Optimized RAG processor with enhanced caching and faster retrieval"""
     
     def __init__(self, openai_client: OpenAI):
         self.openai_client = openai_client
@@ -96,6 +97,7 @@ class RAGProcessor:
         )
         self._embeddings_cache = {}
         self._context_cache = {}
+        self._query_cache = {}
         
     def chunk_text(self, text: str, chunk_size: int = 1000, overlap: int = 200) -> List[str]:
         """Split text into overlapping chunks"""
@@ -123,19 +125,43 @@ class RAGProcessor:
             
         return chunks
     
+    def create_fast_embedding(self, text: str) -> List[float]:
+        """Create a fast hash-based embedding for caching"""
+        # Create a deterministic hash-based embedding
+        hash_obj = hashlib.md5(text.encode())
+        hash_bytes = hash_obj.digest()
+        
+        # Convert to 1536-dimensional vector (same as OpenAI embeddings)
+        embedding = []
+        for i in range(1536):
+            byte_index = i % len(hash_bytes)
+            embedding.append(hash_bytes[byte_index] / 255.0)
+        
+        return embedding
+    
     @lru_cache(maxsize=1000)
     def get_embeddings_cached(self, text: str) -> List[float]:
         """Get embeddings with caching to avoid repeated API calls"""
+        # Check if we have a cached version first
+        text_hash = hashlib.md5(text.encode()).hexdigest()
+        if text_hash in self._embeddings_cache:
+            return self._embeddings_cache[text_hash]
+        
         try:
             response = self.openai_client.embeddings.create(
                 model="text-embedding-3-small",
                 input=[text]
             )
-            return response.data[0].embedding
+            embedding = response.data[0].embedding
+            # Cache the result
+            self._embeddings_cache[text_hash] = embedding
+            return embedding
         except Exception as e:
             print(f"Error getting embeddings: {e}")
-            # Fallback to simple hash-based embeddings
-            return [hash(text) % 1000 / 1000.0 for _ in range(1536)]
+            # Use fast hash-based embedding as fallback
+            embedding = self.create_fast_embedding(text)
+            self._embeddings_cache[text_hash] = embedding
+            return embedding
     
     def get_embeddings(self, texts: List[str]) -> List[List[float]]:
         """Get embeddings for a list of texts with caching"""
@@ -176,10 +202,12 @@ class RAGProcessor:
             )
             print(f"Processed {len(all_chunks)} chunks from {len(documents)} documents")
     
-    def retrieve_relevant_context(self, query: str, top_k: int = 3) -> str:
-        """Retrieve relevant context for a query with caching"""
-        # Simple cache key
-        cache_key = f"{query[:50]}_{top_k}"
+    def retrieve_relevant_context(self, query: str, top_k: int = 2) -> str:
+        """Retrieve relevant context for a query with enhanced caching"""
+        # Create a more robust cache key
+        query_normalized = query.lower().strip()
+        cache_key = f"{hashlib.md5(query_normalized.encode()).hexdigest()}_{top_k}"
+        
         if cache_key in self._context_cache:
             return self._context_cache[cache_key]
         
@@ -304,13 +332,18 @@ If the user is engaging in discussion, try to steer them towards getting in touc
         return system_prompt
     
     def chat(self, message, history):
-        # Only use RAG for longer queries or specific questions
-        use_rag = len(message) > 20 or any(keyword in message.lower() for keyword in 
-                                          ['experience', 'skill', 'project', 'work', 'job', 'career', 'background'])
+        # More aggressive filtering for RAG usage
+        rag_keywords = ['experience', 'skill', 'project', 'work', 'job', 'career', 'background', 
+                       'python', 'data', 'machine', 'learning', 'ai', 'ml', 'analytics', 'research']
+        
+        use_rag = (len(message) > 30 or 
+                  any(keyword in message.lower() for keyword in rag_keywords) or
+                  '?' in message)
         
         relevant_context = ""
         if use_rag:
-            relevant_context = self.rag_processor.retrieve_relevant_context(message)
+            # Use smaller top_k for faster retrieval
+            relevant_context = self.rag_processor.retrieve_relevant_context(message, top_k=2)
         
         # Create system prompt with RAG context
         system_prompt = self.system_prompt(relevant_context)
@@ -318,16 +351,17 @@ If the user is engaging in discussion, try to steer them towards getting in touc
         messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": message}]
         
         # Limit tool call iterations to prevent infinite loops
-        max_iterations = 3
+        max_iterations = 2  # Reduced from 3
         iteration = 0
         
         while iteration < max_iterations:
-                    response = self.gemini.chat.completions.create(
-            model="gemini-2.5-pro", 
-            messages=messages, 
-            tools=tools,  # type: ignore
-            max_tokens=1000  # Limit response length for faster responses
-        )
+            response = self.gemini.chat.completions.create(
+                model="gemini-1.5-flash",  # Use faster model
+                messages=messages, 
+                tools=tools,  # type: ignore
+                max_tokens=800,  # Reduced for faster responses
+                temperature=0.7  # Slightly lower for more focused responses
+            )
             
             if response.choices[0].finish_reason == "tool_calls":
                 message = response.choices[0].message
