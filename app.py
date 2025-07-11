@@ -170,16 +170,26 @@ class RAGProcessor:
             embeddings.append(self.get_embeddings_cached(text))
         return embeddings
     
-    def process_documents(self, documents: Dict[str, str]):
+    def process_documents(self, documents: Dict[str, str], force_reprocess: bool = False):
         """Process and store documents in the vector database"""
         # Check if documents are already processed
         try:
             count = self.collection.count()
-            if count > 0:
+            if count > 0 and not force_reprocess:
                 print(f"Vector database already contains {count} documents, skipping processing")
+                print("To force reprocessing, use: me.rag_processor.process_documents(documents, force_reprocess=True)")
                 return
         except:
             pass
+        
+        # If forcing reprocess, clear the collection first
+        if force_reprocess:
+            try:
+                print("Force reprocessing - clearing existing documents...")
+                self.collection.delete(where={})
+                print("✅ Cleared existing documents")
+            except Exception as e:
+                print(f"Warning: Could not clear collection: {e}")
         
         all_chunks = []
         all_metadata = []
@@ -197,7 +207,7 @@ class RAGProcessor:
             self.collection.add(
                 embeddings=embeddings,  # type: ignore
                 documents=all_chunks,
-                metadatas=all_metadata,
+                metadatas=all_metadata,  # type: ignore
                 ids=[f"chunk_{i}" for i in range(len(all_chunks))]
             )
             print(f"Processed {len(all_chunks)} chunks from {len(documents)} documents")
@@ -348,33 +358,36 @@ class Me:
         system_prompt = f"You are acting as {self.name}. You are answering questions on {self.name}'s website, \
 particularly questions related to {self.name}'s career, background, skills and experience. \
 Your responsibility is to represent {self.name} for interactions on the website as faithfully as possible. \
-You are given a summary of {self.name}'s background and LinkedIn profile which you can use to answer questions. \
 Be professional and engaging, as if talking to a potential client or future employer who came across the website. \
 If you don't know the answer to any question, use your record_unknown_question tool to record the question that you couldn't answer, even if it's about something trivial or unrelated to career. \
 If the user is engaging in discussion, try to steer them towards getting in touch via email; ask for their email and record it using your record_user_details tool. "
 
-        system_prompt += f"\n\n## Summary:\n{self.summary}\n\n## LinkedIn Profile:\n{self.linkedin}\n\n"
-        
-        # Add RAG context if available
+        # Add RAG context FIRST if available (prioritize RAG over static content)
         if relevant_context:
-            system_prompt += f"\n## Relevant Information from Knowledge Base:\n{relevant_context}\n\n"
+            system_prompt += f"\n\n## RELEVANT INFORMATION FROM KNOWLEDGE BASE:\n{relevant_context}\n\n"
+            system_prompt += f"Use the above information as your PRIMARY source for answering questions. "
         
-        system_prompt += f"With this context, please chat with the user, always staying in character as {self.name}."
+        # Add static content as fallback
+        system_prompt += f"\n\n## Basic Background Information:\nSummary: {self.summary}\n\nLinkedIn Profile: {self.linkedin}\n\n"
+        
+        system_prompt += f"With this context, please chat with the user, always staying in character as {self.name}. "
+        system_prompt += f"Prioritize information from the knowledge base when available."
         return system_prompt
     
     def chat(self, message, history):
-        # More aggressive filtering for RAG usage
-        rag_keywords = ['experience', 'skill', 'project', 'work', 'job', 'career', 'background', 
-                       'python', 'data', 'machine', 'learning', 'ai', 'ml', 'analytics', 'research']
+        # Use RAG for most queries to ensure knowledge is accessed
+        # Only skip RAG for very simple greetings
+        simple_greetings = ['hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening']
         
-        use_rag = (len(message) > 30 or 
-                  any(keyword in message.lower() for keyword in rag_keywords) or
-                  '?' in message)
+        use_rag = not any(greeting in message.lower() for greeting in simple_greetings)
         
         relevant_context = ""
         if use_rag:
-            # Use smaller top_k for faster retrieval
-            relevant_context = self.rag_processor.retrieve_relevant_context(message, top_k=2)
+            # Use more context for better coverage
+            relevant_context = self.rag_processor.retrieve_relevant_context(message, top_k=3)
+            print(f"RAG: Retrieved context for query: {message[:50]}...")
+        else:
+            print(f"RAG: Skipped for simple greeting: {message}")
         
         # Create system prompt with RAG context
         system_prompt = self.system_prompt(relevant_context)
