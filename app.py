@@ -435,22 +435,25 @@ def chat_interface(message, history):
     me = get_me_instance()
     return me.chat(message, history)
 
-# For Hugging Face deployment
-def create_demo():
-    """Create the Gradio demo for Hugging Face"""
-    demo = gr.ChatInterface(
-        fn=chat_interface,
-        title="🤖 AI Chatbot with RAG",
-        description="Chat with Muhammad Iqbal Hilmy Izzulhaq's AI assistant with RAG knowledge base",
-        examples=[
-            "What's your thesis topic?",
-            "Tell me about your experience with Python",
-            "What skills do you have?",
-            "What projects have you worked on?"
-        ]
-    )
-    return demo
+# Create the Gradio demo for Hugging Face deployment
+demo = gr.ChatInterface(
+    fn=chat_interface,
+    title="🤖 AI Chatbot with RAG",
+    description="Chat with Muhammad Iqbal Hilmy Izzulhaq's AI assistant with RAG knowledge base",
+    examples=[
+        "What's your thesis topic?",
+        "Tell me about your experience with Python",
+        "What skills do you have?",
+        "What projects have you worked on?",
+        "Tell me about your background",
+        "What research did you do?"
+    ]
+)
 
 if __name__ == "__main__":
+    # For local development
     me = Me()
     gr.ChatInterface(me.chat, type="messages").launch()
+else:
+    # For Hugging Face deployment
+    demo.launch()
