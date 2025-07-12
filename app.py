@@ -420,40 +420,6 @@ If the user is engaging in discussion, try to steer them towards getting in touc
         return response.choices[0].message.content
     
 
-# Create a global instance for Hugging Face deployment
-me_instance = None
-
-def get_me_instance():
-    """Get or create the Me instance (for Hugging Face deployment)"""
-    global me_instance
-    if me_instance is None:
-        me_instance = Me()
-    return me_instance
-
-def chat_interface(message, history):
-    """Chat interface function for Hugging Face deployment"""
-    me = get_me_instance()
-    return me.chat(message, history)
-
-# Create the Gradio demo for Hugging Face deployment
-demo = gr.ChatInterface(
-    fn=chat_interface,
-    title="🤖 AI Chatbot with RAG",
-    description="Chat with Muhammad Iqbal Hilmy Izzulhaq's AI assistant with RAG knowledge base",
-    examples=[
-        "What's your thesis topic?",
-        "Tell me about your experience with Python",
-        "What skills do you have?",
-        "What projects have you worked on?",
-        "Tell me about your background",
-        "What research did you do?"
-    ]
-)
-
 if __name__ == "__main__":
-    # For local development
     me = Me()
     gr.ChatInterface(me.chat, type="messages").launch()
-else:
-    # For Hugging Face deployment
-    demo.launch()
