@@ -383,8 +383,8 @@ If the user is engaging in discussion, try to steer them towards getting in touc
         
         relevant_context = ""
         if use_rag:
-            # Use more context for better coverage
-            relevant_context = self.rag_processor.retrieve_relevant_context(message, top_k=3)
+            # Use more context for better coverage - increased from 3 to 8
+            relevant_context = self.rag_processor.retrieve_relevant_context(message, top_k=8)
             print(f"RAG: Retrieved context for query: {message[:50]}...")
         else:
             print(f"RAG: Skipped for simple greeting: {message}")
