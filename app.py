@@ -277,7 +277,9 @@ class Me:
 
     def __init__(self):
         self.gemini = OpenAI(base_url="https://generativelanguage.googleapis.com/v1beta/openai/", api_key=os.getenv("GEMINI_API_KEY"))
+        self.openai = OpenAI(api_key = os.getenv('OPENAI_API_KEY'))
         self.name = "Muhammad Iqbal Hilmy Izzulhaq"
+        
         
         # Load static content first for faster startup
         print("Loading static content...")
@@ -399,12 +401,12 @@ If the user is engaging in discussion, try to steer them towards getting in touc
         iteration = 0
         
         while iteration < max_iterations:
-            response = self.gemini.chat.completions.create(
-                model="gemini-2.5-flash",  # Use faster model
+            response = self.openai.chat.completions.create(
+                model="gpt-4o-mini",  # Use faster model
                 messages=messages, 
                 tools=tools,  # type: ignore
                 max_tokens=None,  # Increased for complete responses
-                temperature=0.7  # Slightly lower for more focused responses
+                temperature=0.5  # Slightly lower for more focused responses
             )
             
             if response.choices[0].finish_reason == "tool_calls":
