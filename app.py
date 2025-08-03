@@ -403,7 +403,7 @@ If the user is engaging in discussion, try to steer them towards getting in touc
                 model="gemini-2.5-flash",  # Use faster model
                 messages=messages, 
                 tools=tools,  # type: ignore
-                max_tokens=2048,  # Increased for complete responses
+                max_tokens=None,  # Increased for complete responses
                 temperature=0.7  # Slightly lower for more focused responses
             )
             
