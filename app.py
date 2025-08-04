@@ -276,7 +276,7 @@ class RAGProcessor:
 class Me:
 
     def __init__(self):
-        self.gemini = OpenAI(base_url="https://generativelanguage.googleapis.com/v1beta/openai/", api_key=os.getenv("GEMINI_API_KEY"))
+        self.gemini = OpenAI(base_url="https://generativelanguage.googleapis.com/v1beta/openai/", api_key=os.getenv("GOOGLE_API_KEY"))
         self.openai = OpenAI(api_key = os.getenv('OPENAI_API_KEY'))
         self.name = "Muhammad Iqbal Hilmy Izzulhaq"
         
