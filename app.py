@@ -390,7 +390,7 @@ If the user is engaging in discussion, try to steer them towards getting in touc
         messages = [{"role": "system", "content": system_prompt}] + chat_history + [{"role": "user", "content": message}]
         
         while iteration < max_iterations:
-            response = openai.ChatCompletion.create(
+            response = self.openai.ChatCompletion.create(
                 model="gpt-4o",  # or any model you're using
                 messages=messages,
                 tools=self.tools,
