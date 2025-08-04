@@ -377,49 +377,50 @@ If the user is engaging in discussion, try to steer them towards getting in touc
         return system_prompt
     
     def chat(self, message, history):
-        # Use RAG for most queries to ensure knowledge is accessed
-        # Only skip RAG for very simple greetings
-        simple_greetings = ['hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening']
-        
-        use_rag = not any(greeting in message.lower() for greeting in simple_greetings)
-        
-        relevant_context = ""
-        if use_rag:
-            # Use more context for better coverage - increased from 3 to 8
-            relevant_context = self.rag_processor.retrieve_relevant_context(message, top_k=8)
-            print(f"RAG: Retrieved context for query: {message[:50]}...")
-        else:
-            print(f"RAG: Skipped for simple greeting: {message}")
-        
-        # Create system prompt with RAG context
-        system_prompt = self.system_prompt(relevant_context)
-        
-        messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": message}]
-        
-        # Limit tool call iterations to prevent infinite loops
-        max_iterations = 2  # Reduced from 3
+        system_prompt = self.system_prompt
         iteration = 0
+        max_iterations = 3
+
+        # 🛠️ Convert history to OpenAI-compatible messages
+        chat_history = []
+        for user_msg, assistant_msg in history:
+            chat_history.append({"role": "user", "content": user_msg})
+            chat_history.append({"role": "assistant", "content": assistant_msg})
+
+        messages = [{"role": "system", "content": system_prompt}] + chat_history + [{"role": "user", "content": message}]
         
         while iteration < max_iterations:
-            response = self.openai.chat.completions.create(
-                model="gpt-4o-mini",  # Use faster model
-                messages=messages, 
-                tools=tools,  # type: ignore
-                max_tokens=None,  # Increased for complete responses
-                temperature=0.5  # Slightly lower for more focused responses
+            response = openai.ChatCompletion.create(
+                model="gpt-4o",  # or any model you're using
+                messages=messages,
+                tools=self.tools,
+                tool_choice="auto"
             )
-            
-            if response.choices[0].finish_reason == "tool_calls":
-                message = response.choices[0].message
-                tool_calls = message.tool_calls
-                results = self.handle_tool_call(tool_calls)
-                messages.append(message)
-                messages.extend(results)
+
+            reply = response.choices[0].message
+
+            if reply.get("tool_calls"):
+                for tool_call in reply.tool_calls:
+                    function_name = tool_call.function.name
+                    arguments = json.loads(tool_call.function.arguments)
+
+                    # Call the tool
+                    tool_result = self.tool_router.call_tool(function_name, arguments)
+
+                    # Add tool response to the conversation
+                    messages.append(reply)  # assistant's tool call
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "content": tool_result,
+                    })
+
                 iteration += 1
             else:
-                break
+                return reply.content  # 🧠 Final LLM response — return it
 
-        return response.choices[0].message.content
+        return "⚠️ Too many tool calls. Please try rephrasing your question."
+
     
 
 if __name__ == "__main__":
