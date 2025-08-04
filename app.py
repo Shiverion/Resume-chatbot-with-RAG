@@ -418,7 +418,7 @@ If the user is engaging in discussion, try to steer them towards getting in touc
                 iteration += 1
             else:
                 break
-                
+
         return response.choices[0].message.content
     
 
