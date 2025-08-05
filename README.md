@@ -2,7 +2,7 @@ this is my readme.md so far
 
 # 🧠 Career Conversations Chatbot
 
-A smart conversational agent designed to help users reflect on their career goals, aspirations, and experiences — powered by Retrieval-Augmented Generation (RAG).Built with ❤️ using lightweight tools like Gradio, OpenAI, and ChromaDB, and managed via the ultra-fast uv package manager from Astral.The system delivers grounded, personalized responses by injecting context from an uploaded CV, retrieved through a vector database.Ideal for career exploration, self-reflection, or just having a deep chat with an AI that knows your resume better than you do
+A smart conversational agent designed to help users reflect on their career goals, aspirations, and experiences — powered by Retrieval-Augmented Generation (RAG). Built with ❤️ using lightweight tools like Gradio, OpenAI, and ChromaDB, and managed via the ultra-fast uv package manager from Astral. The system delivers grounded, personalized responses by injecting context from an uploaded CV, retrieved through a vector database. Ideal for career exploration, self-reflection, or just having a deep chat with an AI that knows your resume better than you do
 
 ## 🧘‍♂️ What Kind of Chatbot Is This?
 Think of it as a career coach meets your inner voice — thoughtful, slightly cheeky, and curious about your goals. It’ll ask you things like:
