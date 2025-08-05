@@ -1,1 +1,6 @@
-I am a Data science enthusiast with hands-on experience in machine learning, NLP, and Retrieval-Augmented Generation (RAG) systems. Skilled in developing agentic AI workflows using LangGraph, LangChain, and OpenAI Assistants, with practical deployment using both code-first and no-code tools like Dify.AI. Currently interning at DPR RI, where I build autonomous systems that streamline legal document search and summarization to support legislative decision-making. Passionate about creating AI solutions that are both intelligent and actionable
+
+Name: John Doe
+Profession: Data Sorcerer (unlicensed)
+Summary:
+A highly enthusiastic individual with a knack for turning caffeine into machine learning models. 
+Enjoys long walks on the terminal and debugging late into the night. Still trying to figure out what a ‘full stack’ actually is.
