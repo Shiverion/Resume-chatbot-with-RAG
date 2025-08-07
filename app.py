@@ -410,11 +410,10 @@ If the user is engaging in discussion, try to steer them towards getting in touc
         
         while iteration < max_iterations:
             response = self.openai.chat.completions.create(
-                model="gpt-5-mini",  # Use faster model
+                model="gpt-5",  # Use faster model
                 messages=messages, 
                 tools=tools,  # type: ignore
-                max_tokens=None,  # Increased for complete responses
-                temperature=0.5  # Slightly lower for more focused responses
+                temperature=1  
             )
             
             if response.choices[0].finish_reason == "tool_calls":
