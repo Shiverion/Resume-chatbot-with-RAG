@@ -277,7 +277,7 @@ class Me:
 
     def __init__(self):
         self.openai = OpenAI(api_key = os.getenv('OPENAI_API_KEY'))
-        self.name = "Muhammad Iqbal Hilmy Izzulhaq"
+        self.name = "your name" # Replace with your actual name
         
         
         # Load static content first for faster startup
@@ -393,7 +393,16 @@ If the user is engaging in discussion, try to steer them towards getting in touc
         # Create system prompt with RAG context
         system_prompt = self.system_prompt(relevant_context)
         
-        messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": message}]
+        # --- START OF FIX ---
+        # Format the history from Gradio's [[user, assistant], ...] 
+        # to OpenAI's [{"role": "user", ...}, {"role": "assistant", ...}]
+        formatted_history = []
+        for user_msg, assistant_msg in history:
+            formatted_history.append({"role": "user", "content": user_msg})
+            formatted_history.append({"role": "assistant", "content": assistant_msg})
+
+        messages = [{"role": "system", "content": system_prompt}] + formatted_history + [{"role": "user", "content": message}]
+        # --- END OF FIX ---
         
         # Limit tool call iterations to prevent infinite loops
         max_iterations = 2  # Reduced from 3
