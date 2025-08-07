@@ -1,34 +1,42 @@
-this is my readme.md so far
-
 # 🧠 Career Conversations Chatbot
 
-A smart conversational agent designed to help users reflect on their career goals, aspirations, and experiences — powered by Retrieval-Augmented Generation (RAG). Built with ❤️ using lightweight tools like Gradio, OpenAI, and ChromaDB, and managed via the ultra-fast uv package manager from Astral. The system delivers grounded, personalized responses by injecting context from an uploaded CV, retrieved through a vector database. Ideal for career exploration, self-reflection, or just having a deep chat with an AI that knows your resume better than you do
+A smart conversational agent designed to help users reflect on their career goals, aspirations, and experiences — powered by **Retrieval-Augmented Generation (RAG)** and OpenAI's GPT-4o-mini. Built with ❤️ using lightweight tools like **Gradio**, **OpenAI SDK**, and **ChromaDB**, and managed via the blazing-fast **uv** package manager. 
+
+This project lets users upload their resume and simulate a career conversation — as if you're chatting with an AI version of yourself that actually *knows* what's on your CV. Perfect for personal reflection, mock interviews, or just seeing your experience through a new lens.
+
+---
 
 ## 🧘‍♂️ What Kind of Chatbot Is This?
-Think of it as a career coach meets your inner voice — thoughtful, slightly cheeky, and curious about your goals. It’ll ask you things like:
+
+Think of it as a career coach meets your smarter inner voice — thoughtful, slightly cheeky, and deeply curious about your goals. It might ask:
 
 - “What’s one project you’re proud of and why?”
-
 - “What do you value more: impact or income?”
+- “Which part of your resume feels the most ‘you’?”
 
-- “Which part of your resume feels like ‘you’ the most?”
+---
 
 ## 🚀 What This Project Does
 
-This chatbot is like your personal career therapist (but less judgmental and more available). It:
+This chatbot acts like a personal career therapist (but less judgmental and always available). It:
 
-- Lets you upload your CV and extract insights from it.
-- Uses RAG to ground responses based on your background.
-- Helps simulate coaching-style conversations for personal growth, job prep, or self-reflection.
-- Can be extended with embeddings, vector stores, or agent workflows.
+- 🧾 Lets you upload your CV (PDF or text) and reads it using `pypdf`
+- 🧠 Uses a RAG pipeline with ChromaDB to ground responses in your real experience
+- 💬 Simulates conversations using OpenAI's GPT-4o-mini
+- ⚙️ Records unanswerable questions and user contact via OpenAI tool-calling and Pushover
+- 🧰 Is easily extendable with function calling, agents, or external APIs
+
+---
 
 ## 🧩 Core Features
 
-- 🔍 **Document-based Chat (RAG)**: Grounded responses using your uploaded CV or resume.
-- 🤖 **LLM-powered Responses**: Powered by OpenAI ChatGPT models.
-- 🌐 **FastAPI App**: Lightweight, fast backend.
-- ⚡ **Deployment-ready**: Works locally and on Hugging Face Spaces.
-- 🐍 **Pythonic & Modular**: Easy to extend with more logic (e.g., agents, tools, function calling).
+- 🔍 **Context-Aware Chat (RAG)**: Upload your resume, and the bot responds with contextual insights.
+- 💬 **LLM-based Conversations**: Uses GPT-4o-mini with multi-step tool calls.
+- 📁 **Local File Handling**: Processes `.pdf`, `.txt`, and `.md` files from the `me/` folder.
+- ☁️ **Pushover Integration**: Sends push alerts for user interest and unknown questions.
+- 🧠 **Cached Embeddings**: Efficient vector search via `hashlib` and `lru_cache` fallback embedding.
+- 💻 **Gradio Interface**: Simple and clean interface to talk to the agent.
+- ⚡ **UV Environment**: Blazing-fast environment setup with [uv](https://github.com/astral-sh/uv).
 
 ---
 
@@ -63,7 +71,21 @@ pip install uv
 ```bash
 uv sync
 ```
-### 4. Don't forget to put your sample_cv.pdf, and your summary.txt in \me folder
+### 4. Prepare Your Documents
+Put your files in the /me folder:
+
+    1. Rename your resume to linkedin.pdf
+    2. Add a summary of your professional story in summary.txt
+    3. Add any supporting files that describe yourself
+
+### 5. Set Up Environment Variables
+Create a .env file with your API key
+
+``` env
+OPENAI_API_KEY=your_openai_key
+PUSHOVER_USER=your_pushover_user_key
+PUSHOVER_TOKEN=your_pushover_app_token
+```
 
 ### 5. Run the app
 
