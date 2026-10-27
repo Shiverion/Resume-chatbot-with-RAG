@@ -40,6 +40,46 @@ This chatbot acts like a personal career therapist (but less judgmental and alwa
 
 ---
 
+## System Design
+
+### Requirements
+
+**Functional**
+- Load local PDF, text, and Markdown career documents, retrieve supporting context, and answer questions in a Gradio chat.
+- Record contact-interest and unanswerable-question events through Pushover when configured.
+
+**Non-functional**
+- Chroma persists the local vector collection under `vector_db/`.
+- Embeddings and chat use the OpenAI API; a deterministic hash embedding is used as a fallback when embedding requests fail.
+
+### High-Level Architecture
+
+```text
+Files under me/ → PDF/text extraction → Chroma persistent collection
+Chat question → cached embedding → top-k context → OpenAI GPT-5
+                                       └→ optional Pushover tool calls
+```
+
+The chat requests up to eight relevant chunks. Source document contents and conversation context are sent to OpenAI for generation.
+
+### Scale and Reliability
+
+- Documents are processed when the Gradio app initializes; collection refresh is an explicit local operation.
+- Chroma and cached results are local to the app instance; no shared index service is configured.
+
+### Trade-offs
+
+| Decision | Benefit | Cost |
+| --- | --- | --- |
+| Keep the knowledge base in local Chroma | Simple setup and local index ownership | No shared multi-instance index or built-in synchronization |
+| Use cached and fallback embeddings | Keeps retrieval code available through transient API errors | Hash vectors do not provide semantic similarity |
+
+### What to Revisit
+
+- Add an explicit document refresh and index version process.
+- Add source references to the answer so retrieved context can be checked.
+- Avoid committing private source documents to a public repository.
+
 ## 🛠️ How to Use Locally
 
 ### 1. Clone the Repo
